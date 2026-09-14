@@ -1,5 +1,5 @@
 {
-  "name": "ftvti-backend",
+  "name": "Entrance-Self-Test-backend",
   "version": "1.0.0",
   "description": "Grade 12 Entrance Exam Self-Test System - Backend",
   "main": "dist/index.js",
