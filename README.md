@@ -7,7 +7,7 @@ A full-stack web application that allows students to practice multiple-choice en
 ## 📋 Project Structure
 
 ```
-ftvti/
+Entrance_Self_Test/
 ├── backend/                  # Express.js + TypeScript + Prisma
 │   ├── prisma/
 │   │   ├── schema.prisma     # Database schema (PostgreSQL)
@@ -125,6 +125,65 @@ npm run dev
 ```
 
 The frontend will run on **http://localhost:3000**
+
+---
+
+## Production Deployment
+
+### 1. Database migration to Neon
+
+The backend uses Prisma with PostgreSQL, so no schema provider change is required for Neon. The production `DATABASE_URL` uses Neon SSL and the Neon pooler. `DIRECT_URL` is not used.
+
+From `backend/`, install dependencies and verify the connection:
+
+```bash
+npm install
+npx prisma generate
+npx prisma migrate deploy
+```
+
+Run `npm run db:seed` only when the production database should receive the initial seed data. Never commit `backend/.env`; store the connection string in the hosting provider's environment variables.
+
+### 2. Frontend deployment on Vercel
+
+1. In Vercel, choose **Add New Project**, import the GitHub repository, and select `frontend` as the root directory.
+2. Set the production environment variable `NEXT_PUBLIC_API_URL` to `https://<render-service>.onrender.com/api`.
+3. Use `npm run build` as the build command. The output directory is `.next` and should be left as Vercel's default for Next.js.
+4. Use Node.js 20.x or newer. Redeploy after changing environment variables.
+
+The Vercel project does not need `DATABASE_URL`, `JWT_SECRET`, or `PORT`.
+
+### 3. Backend deployment on Render
+
+1. Create **New > Web Service** in Render and connect the GitHub repository.
+2. Set the root directory to `backend`.
+3. Use Node.js 20.x or newer, `npm install && npm run build` as the build command, and `npm start` as the start command.
+4. The build script runs `prisma migrate deploy`, `prisma generate`, and TypeScript compilation before `npm start` launches the compiled server.
+5. Add the backend environment variables listed below. Render provides `PORT` automatically; leave it unset unless you have a specific reason to set it to Render's assigned port.
+6. Deploy and verify `https://<render-service>.onrender.com/api/health` returns a successful health response.
+
+Set `FRONTEND_URL` to the exact Vercel origin, such as `https://ftvti-self-test.vercel.app`, without a trailing slash. The Express CORS configuration uses this value and enables credentials for the JWT cookie. If a custom Vercel domain is used, update `FRONTEND_URL` to that domain.
+
+### 4. Environment variables checklist
+
+Vercel (`frontend`):
+
+```env
+NEXT_PUBLIC_API_URL=https://<render-service>.onrender.com/api
+```
+
+Render (`backend`):
+
+```env
+DATABASE_URL=postgresql://neondb_owner:<password>@<neon-host>/neondb?sslmode=require&channel_binding=require
+JWT_SECRET=<long-random-production-secret>
+FRONTEND_URL=https://<vercel-project>.vercel.app
+NODE_ENV=production
+# Optional locally; Render supplies PORT automatically
+PORT=10000
+```
+
+Keep the full Neon connection string in `DATABASE_URL`, including `sslmode=require`. Do not add the old Supabase `DIRECT_URL`. Prisma Client is generated automatically during Render's `npm run build`; it can also be generated manually with `npx prisma generate` when troubleshooting.
 
 ---
 
