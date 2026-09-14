@@ -157,7 +157,7 @@ The Vercel project does not need `DATABASE_URL`, `JWT_SECRET`, or `PORT`.
 
 1. Create **New > Web Service** in Render and connect the GitHub repository.
 2. Set the root directory to `backend`.
-3. Use Node.js 20.x or newer, `npm install && npm run build` as the build command, and `npm start` as the start command.
+3. Use Node.js 20.x or newer, `npm install --include=dev && npm run build` as the build command, and `npm start` as the start command. The backend includes an `.npmrc` that also preserves dev dependencies when `NODE_ENV=production` is set.
 4. The build script runs `prisma migrate deploy`, `prisma generate`, and TypeScript compilation before `npm start` launches the compiled server.
 5. Add the backend environment variables listed below. Render provides `PORT` automatically; leave it unset unless you have a specific reason to set it to Render's assigned port.
 6. Deploy and verify `https://<render-service>.onrender.com/api/health` returns a successful health response.
