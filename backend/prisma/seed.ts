@@ -26,7 +26,8 @@ async function main() {
     update: {},
     create: {
       id: "default-config",
-      password: "exam2024",
+      naturalPassword: "exam2024",
+      socialPassword: "exam2024",
       durationMins: 60,
       isActive: true,
       createdBy: adminUser.id,
