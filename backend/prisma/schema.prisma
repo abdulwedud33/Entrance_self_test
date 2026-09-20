@@ -24,6 +24,11 @@ enum SubjectType {
   SHARED
 }
 
+enum ExamMode {
+  PRACTICE
+  EXAM
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -95,6 +100,7 @@ model ExamAttempt {
   subjectId      String?
   subject        Subject?  @relation(fields: [subjectId], references: [id])
   year           Int?
+  mode           ExamMode  @default(EXAM)
   startTime      DateTime
   endTime        DateTime?
   score          Int       @default(0)

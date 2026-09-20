@@ -134,10 +134,10 @@ export const instructorApi = {
 export const examApi = {
   getSubjects: () => apiFetch<Subject[]>("/exam/subjects"),
   getYears: (subjectId: string) => apiFetch<number[]>(`/exam/years?subjectId=${subjectId}`),
-  verifyPassword: (password: string, subjectId: string, year?: number) =>
-    apiFetch<ExamSession>("/exam/verify-password", { method: "POST", body: { password, subjectId, year } }),
-  submit: (answers: Record<string, string>, startTime: string, subjectId: string, year: number) =>
-    apiFetch<ExamResult>("/exam/submit", { method: "POST", body: { answers, startTime, subjectId, year } }),
+  verifyPassword: (password: string, subjectId: string, year: number | undefined, mode: ExamMode) =>
+    apiFetch<ExamSession>("/exam/verify-password", { method: "POST", body: { password, subjectId, year, mode } }),
+  submit: (answers: Record<string, string>, startTime: string, subjectId: string, year: number, mode: ExamMode) =>
+    apiFetch<ExamResult>("/exam/submit", { method: "POST", body: { answers, startTime, subjectId, year, mode } }),
 };
 
 // Compatibility for student pages
@@ -155,6 +155,7 @@ export type Stream = "NATURAL_SCIENCE" | "SOCIAL_SCIENCE";
 export type SubjectType = "STREAM_SPECIFIC" | "SHARED";
 
 export type Gender = "MALE" | "FEMALE";
+export type ExamMode = "PRACTICE" | "EXAM";
 
 export interface Subject {
   id: string;
@@ -212,7 +213,7 @@ export interface ExamQuestion {
   optionC: string;
   optionD: string;
   year: number;
-  correctAnswer: string;
+  correctAnswer?: string;
 }
 
 export interface ExamConfig {
@@ -230,6 +231,7 @@ export interface ExamAttempt {
   subjectId?: string;
   subject?: Subject;
   year?: number;
+  mode: ExamMode;
   startTime: string;
   endTime?: string;
   score: number;
@@ -252,6 +254,7 @@ export interface ExamResult {
   passed: boolean;
   detailedResults: Record<string, any>;
   endTime: string;
+  mode?: ExamMode;
 }
 
 export interface Comment {

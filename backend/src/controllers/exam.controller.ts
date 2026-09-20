@@ -7,11 +7,12 @@ const verifyPasswordSchema = z.object({
   password: z.string().min(1),
   subjectId: z.string().min(1),
   year: z.number().int().optional(),
+  mode: z.enum(["PRACTICE", "EXAM"]).default("EXAM"),
 });
 
 export const verifyExamPassword = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { password, subjectId, year } = verifyPasswordSchema.parse(req.body);
+    const { password, subjectId, year, mode } = verifyPasswordSchema.parse(req.body);
 
     const student = await prisma.student.findUnique({
       where: { userId: req.user!.userId },
@@ -78,10 +79,14 @@ export const verifyExamPassword = async (req: Request, res: Response): Promise<v
       return;
     }
 
+    const visibleQuestions = mode === "EXAM"
+      ? questions.map(({ correctAnswer: _correctAnswer, ...question }) => question)
+      : questions;
+
     res.json({
       durationMins: config.durationMins,
-      totalQuestions: questions.length,
-      questions,
+      totalQuestions: visibleQuestions.length,
+      questions: visibleQuestions,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -97,11 +102,12 @@ const submitExamSchema = z.object({
   startTime: z.string().datetime(),
   subjectId: z.string().optional(),
   year: z.number().optional(),
+  mode: z.enum(["PRACTICE", "EXAM"]).default("EXAM"),
 });
 
 export const submitExam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { answers, startTime, subjectId, year } = submitExamSchema.parse(req.body);
+    const { answers, startTime, subjectId, year, mode } = submitExamSchema.parse(req.body);
 
     const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
     if (!student) {
@@ -134,6 +140,7 @@ export const submitExam = async (req: Request, res: Response): Promise<void> => 
         studentId: student.id,
         subjectId,
         year,
+        mode,
         startTime: new Date(startTime),
         endTime: new Date(),
         score,

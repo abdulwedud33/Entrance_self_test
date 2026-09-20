@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { examApi, ExamSession, ExamResult, Subject } from "@/lib/api";
+import { examApi, ExamMode, ExamSession, ExamResult, Subject } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,10 +25,12 @@ import {
   X,
   BookOpen,
   ArrowRight,
+  Target,
+  ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-type Phase = "select-subject" | "select-year" | "password" | "exam" | "result";
+type Phase = "select-subject" | "select-year" | "select-mode" | "password" | "exam" | "result";
 
 export default function ExamPage() {
   const { toast } = useToast();
@@ -40,6 +42,7 @@ export default function ExamPage() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [years, setYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [mode, setMode] = useState<ExamMode>("EXAM");
   const [password, setPassword] = useState("");
 
   // Session state
@@ -88,15 +91,17 @@ export default function ExamPage() {
   };
 
   const handleYearSelect = () => {
-    if (selectedYear) setPhase("password");
+    if (selectedYear) setPhase("select-mode");
   };
+
+  const handleModeSelect = () => setPhase("password");
 
   const handleVerifyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSubject || !selectedYear) return;
     setLoading(true);
     try {
-      const sess = await examApi.verifyPassword(password, selectedSubject.id, selectedYear);
+      const sess = await examApi.verifyPassword(password, selectedSubject.id, selectedYear, mode);
       setSession(sess);
       const now = new Date().toISOString();
       setStartTime(now);
@@ -118,7 +123,8 @@ export default function ExamPage() {
     if (!selectedSubject || !selectedYear) return;
     setLoading(true);
     try {
-      const res = await examApi.submit(ans, st, selectedSubject.id, selectedYear);
+      const res = await examApi.submit(ans, st, selectedSubject.id, selectedYear, mode);
+      setShowSubmitConfirm(false);
       setResult(res);
       setPhase("result");
     } catch (err: any) {
@@ -126,7 +132,7 @@ export default function ExamPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSubject, selectedYear, toast]);
+  }, [mode, selectedSubject, selectedYear, toast]);
 
   useEffect(() => {
     if (phase !== "exam" || !session) return;
@@ -144,15 +150,18 @@ export default function ExamPage() {
   }, [phase, session, doSubmit]);
 
   const handleSelectAnswer = (qId: string, opt: string) => {
-    if (revealed[qId]) return;
+    if (mode === "PRACTICE" && revealed[qId]) return;
     setAnswers((prev) => ({ ...prev, [qId]: opt }));
-    setRevealed((prev) => ({ ...prev, [qId]: true }));
+    if (mode === "PRACTICE") {
+      setRevealed((prev) => ({ ...prev, [qId]: true }));
+    }
   };
 
   const handleReset = () => {
     setPhase("select-subject");
     setSelectedSubject(null);
     setSelectedYear(null);
+    setMode("EXAM");
     setPassword("");
     setSession(null);
     setResult(null);
@@ -276,6 +285,93 @@ export default function ExamPage() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // ── Phase: SELECT MODE ───────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === "select-mode") {
+    const modeOptions: Array<{
+      value: ExamMode;
+      title: string;
+      description: string;
+      details: string;
+      icon: typeof Target;
+      accent: string;
+    }> = [
+      {
+        value: "PRACTICE",
+        title: "Practice Mode",
+        description: "Learn as you go",
+        details: "See instant right or wrong feedback after each answer, including the correct answer when you miss one.",
+        icon: Target,
+        accent: "emerald",
+      },
+      {
+        value: "EXAM",
+        title: "Exam Mode",
+        description: "Test yourself",
+        details: "No answers are revealed during the timed exam. Review your complete score and answers after submitting.",
+        icon: ShieldCheck,
+        accent: "blue",
+      },
+    ];
+
+    return (
+      <div className="max-w-3xl mx-auto py-8 md:py-12 space-y-8 animate-in slide-in-from-bottom-4 fade-in duration-500">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setPhase("select-year")} className="rounded-full w-11 h-11 p-0">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black uppercase">Step 3 of 4</Badge>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 mt-1">Choose your exam mode</h2>
+            <p className="text-sm text-slate-500 mt-2">{selectedSubject?.name} • {selectedYear}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {modeOptions.map((option) => {
+            const Icon = option.icon;
+            const selected = mode === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setMode(option.value)}
+                className={`relative text-left rounded-3xl border-2 p-6 md:p-8 transition-all duration-300 ${
+                  selected
+                    ? option.accent === "emerald"
+                      ? "border-emerald-500 bg-emerald-50/70 shadow-xl shadow-emerald-500/10"
+                      : "border-blue-500 bg-blue-50/70 shadow-xl shadow-blue-500/10"
+                    : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-lg"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    option.accent === "emerald" ? "bg-emerald-500 text-white" : "bg-blue-500 text-white"
+                  }`}>
+                    <Icon className="w-7 h-7" />
+                  </div>
+                  <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    selected ? (option.accent === "emerald" ? "border-emerald-500 bg-emerald-500" : "border-blue-500 bg-blue-500") : "border-slate-300"
+                  }`}>
+                    {selected && <Check className="w-4 h-4 text-white stroke-[4]" />}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mt-6">{option.title}</h3>
+                <p className="text-sm font-bold text-slate-600 mt-1">{option.description}</p>
+                <p className="text-sm leading-6 text-slate-500 mt-4">{option.details}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <Button className="w-full h-16 rounded-2xl text-lg font-black shadow-xl shadow-primary/20" onClick={handleModeSelect}>
+          Continue to Exam Access <ArrowRight className="ml-2 w-5 h-5" />
+        </Button>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // ── Phase: PASSWORD ──────────────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "password") {
@@ -287,7 +383,7 @@ export default function ExamPage() {
                <Lock className="w-12 h-12 text-primary" />
             </div>
             
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 text-[10px] font-black uppercase">Final Step</Badge>
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 text-[10px] font-black uppercase">Final Step • {mode === "PRACTICE" ? "Practice Mode" : "Exam Mode"}</Badge>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">System Lock</h2>
             <p className="text-muted-foreground font-medium mt-3 mb-10">Enter the secret examination password to unlock your session for <span className="text-primary font-bold">{selectedSubject?.name} ({selectedYear})</span>.</p>
 
@@ -306,8 +402,8 @@ export default function ExamPage() {
               </Button>
             </form>
 
-            <button onClick={() => setPhase("select-year")} className="mt-8 text-xs font-bold text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors">
-              Change Year or Subject
+            <button onClick={() => setPhase("select-mode")} className="mt-8 text-xs font-bold text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors">
+              Change Mode
             </button>
           </CardContent>
         </Card>
@@ -337,6 +433,9 @@ export default function ExamPage() {
             <div className="hidden sm:block">
               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Subject</p>
               <p className="font-extrabold text-sm">{selectedSubject?.name} • {selectedYear}</p>
+              <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${mode === "PRACTICE" ? "text-emerald-600" : "text-blue-600"}`}>
+                {mode === "PRACTICE" ? "Practice Mode • Instant feedback" : "Exam Mode • Feedback after submit"}
+              </p>
             </div>
           </div>
           <div className="text-right">
@@ -368,7 +467,7 @@ export default function ExamPage() {
                   const isCorrect = q.correctAnswer === opt;
                   
                   let style = "bg-slate-50 border-slate-100 text-slate-500 hover:border-primary/20 hover:bg-slate-100/50";
-                  if (isRevealed) {
+                  if (mode === "PRACTICE" && isRevealed) {
                     if (isCorrect) style = "bg-emerald-500 border-emerald-500 text-white scale-[1.02] shadow-xl shadow-emerald-500/20";
                     else if (isSelected) style = "bg-red-500 border-red-500 text-white scale-[1.02] shadow-xl shadow-red-500/20";
                     else style = "bg-slate-50 border-slate-50 text-slate-300 opacity-60";
@@ -394,7 +493,7 @@ export default function ExamPage() {
                 })}
              </div>
 
-             {isRevealed && (
+             {mode === "PRACTICE" && isRevealed && (
                <div className={`p-6 rounded-[1.5rem] flex items-center gap-5 border-2 animate-in slide-in-from-top-4 duration-500 ${
                  answers[q.id] === q.correctAnswer ? "bg-emerald-50 border-emerald-100 text-emerald-800" : "bg-red-50 border-red-100 text-red-800"
                }`}>
@@ -419,11 +518,11 @@ export default function ExamPage() {
            </Button>
            
            {current < session.questions.length - 1 ? (
-             <Button size="lg" className="flex-1 h-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20" onClick={() => setCurrent(c => c + 1)} disabled={!isRevealed}>
+             <Button size="lg" className="flex-1 h-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20" onClick={() => setCurrent(c => c + 1)} disabled={!answers[q.id]}>
                 CONTINUE <ChevronRight className="w-6 h-6 ml-2" />
              </Button>
            ) : (
-             <Button size="lg" className="flex-1 h-16 rounded-2xl font-black text-xl bg-orange-500 hover:bg-orange-600 shadow-xl shadow-orange-500/20" onClick={() => setShowSubmitConfirm(true)} disabled={!isRevealed}>
+             <Button size="lg" className="flex-1 h-16 rounded-2xl font-black text-xl bg-orange-500 hover:bg-orange-600 shadow-xl shadow-orange-500/20" onClick={() => setShowSubmitConfirm(true)} disabled={!answers[q.id]}>
                 FINISH TEST <Send className="w-6 h-6 ml-2" />
              </Button>
            ) }
@@ -432,7 +531,7 @@ export default function ExamPage() {
         {/* Auto Navigator */}
         <div className="pt-10 flex flex-wrap justify-center gap-2 px-8">
            {session.questions.map((sq, i) => {
-             const answered = revealed[sq.id];
+             const answered = Boolean(answers[sq.id]);
              const correct = answered && answers[sq.id] === sq.correctAnswer;
              const isCurr = i === current;
              return (
@@ -441,7 +540,8 @@ export default function ExamPage() {
                  onClick={() => setCurrent(i)}
                  className={`w-10 h-10 rounded-xl font-black text-xs transition-all border-2 ${
                    isCurr ? "bg-primary border-primary text-white scale-125 z-10 shadow-lg ring-4 ring-primary/10" :
-                   answered ? (correct ? "bg-emerald-500 border-emerald-500 text-white" : "bg-red-500 border-red-500 text-white") :
+                   mode === "PRACTICE" && answered ? (correct ? "bg-emerald-500 border-emerald-500 text-white" : "bg-red-500 border-red-500 text-white") :
+                   answered ? "bg-primary/10 border-primary/30 text-primary" :
                    "bg-slate-100 border-slate-100 text-slate-400 group-hover:bg-slate-200"
                  }`}
                >
@@ -511,6 +611,34 @@ export default function ExamPage() {
                     <p className={`text-5xl font-black ${passed ? "text-emerald-500" : "text-red-500"}`}>{result.percentage}%</p>
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-2">Score Rate</p>
                  </div>
+              </div>
+
+              <div className="w-full text-left space-y-3 mb-12">
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="text-lg font-black text-slate-900">Answer Review</h2>
+                  <Badge className={mode === "PRACTICE" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}>
+                    {mode === "PRACTICE" ? "Practice Mode" : "Exam Mode"}
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {Object.entries(result.detailedResults).map(([questionId, detail], index) => {
+                    const isCorrect = detail.isCorrect;
+                    return (
+                      <div key={questionId} className={`rounded-2xl border p-4 ${isCorrect ? "border-emerald-100 bg-emerald-50/70" : "border-red-100 bg-red-50/70"}`}>
+                        <div className="flex items-start gap-3">
+                          {isCorrect ? <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" /> : <XCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />}
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800">{index + 1}. {detail.questionText}</p>
+                            <p className={`text-sm font-semibold mt-2 ${isCorrect ? "text-emerald-700" : "text-red-700"}`}>
+                              Your answer: {detail.selected || "Not answered"}
+                              {!isCorrect && <span className="ml-3">Correct answer: {detail.correct}</span>}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <Button className="h-16 rounded-2xl w-full max-w-xs text-xl font-black shadow-xl" onClick={handleReset}>
